@@ -1,0 +1,17 @@
+{
+  "extName": { "message": "Exam Timer" },
+  "extDesc": { "message": "試験の開始時刻に合わせてタイマーを設定できる時計です。模擬試験の環境をより本番環境に近づけることが期待できます。" },
+  "startExam": { "message": "試験開始" },
+  "reset": { "message": "リセット" },
+  "elapsedTime": { "message": "経過時間" },
+  "examFinished": { "message": "試験終了！" },
+  "prepTime": { "message": "準備時間" },
+  "examPreset": { "message": "試験プリセット" },
+  "startTime": { "message": "開始" },
+  "endTime": { "message": "終了" },
+  "goodWork": { "message": "お疲れ様でした。" },
+  "close": { "message": "閉じる" },
+  "minutes": { "message": "分" },
+  "seconds": { "message": "秒" },
+  "custom": { "message": "カスタム" }
+}

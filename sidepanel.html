@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__MSG_extName__</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+
+  <div id="exam-clock-wrapper" class="p-4">
+    <!-- メインコンテンツエリア -->
+    <div class="flex flex-col items-center justify-center w-full max-w-4xl">
+      <!-- アナログ時計 -->
+      <div id="analog-clock" class="relative w-[280px] h-[280px] bg-white border-8 border-gray-300 dark:bg-gray-800 dark:border-slate-700 rounded-full shadow-2xl flex items-center justify-center cursor-grab active:cursor-grabbing mb-6 transition-colors duration-300">
+        <div class="absolute w-4 h-4 bg-gray-800 border-2 border-white dark:bg-slate-200 dark:border-gray-900 rounded-full z-20 transition-colors duration-300"></div>
+        <div id="hour-hand" class="hand-transition absolute w-2 h-[22%] bg-gray-700 dark:bg-slate-300 rounded-t-full bottom-1/2 origin-bottom z-10 transition-colors duration-300"></div>
+        <div id="minute-hand" class="hand-transition absolute w-1.5 h-[35%] bg-gray-700 dark:bg-slate-200 rounded-t-full bottom-1/2 origin-bottom z-10 transition-colors duration-300"></div>
+        <div id="second-hand" class="hand-transition absolute w-0.5 h-[40%] bg-red-500 bottom-1/2 origin-bottom z-10"></div>
+      </div>
+      
+      <!-- コントロールパネル -->
+      <div id="control-panel" class="bg-[#E9E9E9] dark:bg-gray-800/50 backdrop-blur-md p-6 rounded-2xl shadow-lg w-full max-w-md transition-colors duration-300">
+        <div class="mb-6">
+          <div id="elapsed-time-display" class="w-full text-center text-lg font-bold py-3 rounded-lg bg-[#ffffff] text-gray-700 dark:bg-gray-700 dark:text-slate-200 transition-colors duration-300 font-digital">
+            <!-- This text will be set by JavaScript -->
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+          <div>
+            <label for="preset-select" class="block text-sm font-medium text-[#484D4E] dark:text-[#95A6BE] mb-1 transition-colors duration-300">__MSG_examPreset__</label>
+            <select id="preset-select" class="w-full bg-white border-gray-300 text-gray-800 dark:bg-gray-700 dark:border-gray-600 dark:text-slate-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none transition">
+              <option value="custom">__MSG_custom__</option>
+              <!-- Options will be added by JavaScript -->
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label for="start-time" class="block text-sm font-medium text-[#484D4E] dark:text-[#95A6BE] mb-1 transition-colors duration-300">__MSG_startTime__</label>
+              <input type="time" id="start-time" value="09:00" class="font-digital text-[15px] text-center w-full bg-white border-gray-300 text-gray-800 dark:bg-gray-700 dark:border-gray-600 dark:text-slate-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none transition">
+            </div>
+            <div>
+              <label for="end-time" class="block text-sm font-medium text-[#484D4E] dark:text-[#95A6BE] mb-1 transition-colors duration-300">__MSG_endTime__</label>
+              <input type="time" id="end-time" value="10:30" class="font-digital text-[15px] text-center w-full bg-white border-gray-300 text-gray-800 dark:bg-gray-700 dark:border-gray-600 dark:text-slate-200 rounded-lg px-2 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none transition">
+            </div>
+          </div>
+        </div>
+        <div class="mt-6">
+          <button id="start-reset-btn" class="w-full text-lg font-bold py-3 rounded-lg transition-all duration-300 ease-in-out shadow-md hover:shadow-lg focus:outline-none focus:ring-opacity-50">
+            __MSG_startExam__
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- アラームモーダル -->
+    <div id="alarm-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 z-[60] flex items-center justify-center p-4">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl p-8 text-center shadow-2xl max-w-sm w-full transition-colors duration-300">
+        <h2 class="text-4xl font-bold text-[#EC0000] mb-4 animate-pulse">__MSG_examFinished__</h2>
+        <p class="text-gray-700 dark:text-slate-300 mb-6 transition-colors duration-300">__MSG_goodWork__</p>
+        <button id="close-alarm-btn" class="bg-[#259D63] hover:bg-[#197A4B] text-white font-bold py-2 px-6 rounded-lg transition">__MSG_close__</button>
+      </div>
+    </div>
+    
+    <!-- 準備時間設定パネル -->
+    <div id="ready-time-panel" class="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-3 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] dark:shadow-[0_-2px_10px_rgba(0,0,0,0.3)] transition-colors duration-300">
+      <div class="max-w-md mx-auto flex items-center justify-center gap-4">
+        <label class="font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">__MSG_prepTime__:</label>
+        <div class="flex items-center gap-2">
+          <input type="number" id="ready-minutes" min="0" max="59" value="0" class="font-digital w-20 text-center bg-white border-gray-300 text-gray-800 dark:bg-gray-700 dark:border-gray-600 dark:text-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-cyan-500 focus:outline-none transition">
+          <span class="text-slate-600 dark:text-slate-300">__MSG_minutes__</span>
+          <input type="number" id="ready-seconds" min="0" max="59" value="10" class="font-digital w-20 text-center bg-white border-gray-300 text-gray-800 dark:bg-gray-700 dark:border-gray-600 dark:text-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-cyan-500 focus:outline-none transition">
+          <span class="text-slate-600 dark:text-slate-300">__MSG_seconds__</span>
+        </div>
+      </div>
+    </div>
+
+    <audio id="alarm-sound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+  </div>
+
+  <!-- This script must be at the end of the body -->
+  <script src="sidepanel.js" type="module"></script>
+</body>
+</html>

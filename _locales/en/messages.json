@@ -1,0 +1,17 @@
+{
+  "extName": { "message": "Exam Timer" },
+  "extDesc": { "message": "A clock that allows you to set a timer according to the exam's start time. It helps you simulate real exam conditions for your practice tests." },
+  "startExam": { "message": "Start Exam" },
+  "reset": { "message": "Reset" },
+  "elapsedTime": { "message": "Elapsed Time" },
+  "examFinished": { "message": "Exam Finished!" },
+  "prepTime": { "message": "Prep Time" },
+  "examPreset": { "message": "Exam Preset" },
+  "startTime": { "message": "Start" },
+  "endTime": { "message": "End" },
+  "goodWork": { "message": "Good work!" },
+  "close": { "message": "Close" },
+  "minutes": { "message": "min" },
+  "seconds": { "message": "sec" },
+  "custom": { "message": "Custom" }
+}
