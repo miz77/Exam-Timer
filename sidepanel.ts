@@ -3,6 +3,167 @@ import { presets } from './timer-presets.js';
 import { ExamTimer } from './timerLogic.js';
 import type { TimerState } from './timerLogic.js';
 
+// ==== 手動言語切替の追加 (dynamic i18n override) ====
+type LocaleMessages = Record<string, string>;
+const localeCache: Record<string, LocaleMessages> = {};
+let currentMessages: LocaleMessages = {}; // 選択中ロケールのメッセージ (chrome.i18n を上書き)
+let currentLocaleOverride: string | null = null;
+
+function t(key: string): string {
+  return (currentMessages && currentMessages[key]) || chrome.i18n.getMessage(key) || key;
+}
+
+async function loadLocaleMessages(locale: string): Promise<LocaleMessages> {
+  if (localeCache[locale]) return localeCache[locale];
+  try {
+    const url = chrome.runtime.getURL(`/_locales/${locale}/messages.json`);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('fetch failed');
+    const raw = await res.json();
+    const map: LocaleMessages = {};
+    for (const k in raw) map[k] = raw[k].message;
+    localeCache[locale] = map;
+    return map;
+  } catch (e) {
+    console.warn('Failed loading locale', locale, e);
+    return {};
+  }
+}
+
+async function setLocale(locale: string) {
+  if (currentLocaleOverride === locale) return;
+  currentMessages = await loadLocaleMessages(locale);
+  currentLocaleOverride = locale;
+  try { chrome.storage?.local.set({ overrideLocale: locale }); } catch {}
+  applyTranslations();
+  updateLocaleSwitcherActive(locale);
+}
+
+function applyTranslations() {
+  // 静的ラベル
+  const sel = (q: string) => document.querySelector(q) as HTMLElement | null;
+  sel('label[for="preset-select"]')!.textContent = t('examPreset');
+  sel('label[for="start-time"]')!.textContent = t('startTime');
+  sel('label[for="end-time"]')!.textContent = t('endTime');
+  const alarmH2 = document.querySelector('#alarm-modal h2') as HTMLElement | null; if (alarmH2) alarmH2.textContent = t('examFinished');
+  const alarmP = document.querySelector('#alarm-modal p') as HTMLElement | null; if (alarmP) alarmP.textContent = t('goodWork');
+  const closeBtn = document.getElementById('close-alarm-btn'); if (closeBtn) closeBtn.textContent = t('close');
+  const readyLabel = document.querySelector('#ready-time-panel label') as HTMLLabelElement | null; if (readyLabel) readyLabel.textContent = t('prepTime');
+  const readySpans = document.querySelectorAll('#ready-time-panel span');
+  if (readySpans[0]) readySpans[0].textContent = t('minutes');
+  if (readySpans[1]) readySpans[1].textContent = t('seconds');
+  const customOpt = document.querySelector('option[value="custom"]') as HTMLOptionElement | null; if (customOpt) customOpt.textContent = t('custom');
+
+  // 開始/リセットボタン (状態に応じたラベルを再評価)
+  if (startResetBtn) {
+    // 状態判定 (running/readying なら reset, それ以外 startExam)
+    const running = timer.currentStatus === 'running' || timer.currentStatus === 'readying';
+    startResetBtn.textContent = running ? t('reset') : t('startExam');
+  }
+
+  // 経過時間表示のラベル更新 (前半を置換) override 言語も考慮
+  if (elapsedTimeDisplay.textContent) {
+    const txt = elapsedTimeDisplay.textContent;
+    const elapsedLabel = t('elapsedTime');
+    const prepLabel = t('prepTime');
+    if (txt.startsWith(elapsedLabel)) {
+      elapsedTimeDisplay.textContent = txt.replace(/^.*?:/, `${elapsedLabel}:`);
+    } else if (txt.startsWith(prepLabel)) {
+      elapsedTimeDisplay.textContent = txt.replace(/^.*?:/, `${prepLabel}:`);
+    } else if (/^[^:]+:/.test(txt)) {
+      const parts = txt.split(':');
+      if (parts.length > 1) {
+        const rest = parts.slice(1).join(':');
+        const runningPrep = timer.currentStatus === 'readying';
+        elapsedTimeDisplay.textContent = `${runningPrep ? prepLabel : elapsedLabel}:${rest}`;
+      }
+    }
+  }
+
+  // エラーバナー再翻訳
+  if (errorBannerEl) {
+    const headingEl = errorBannerEl.querySelector('#exam-timer-error-banner-heading') as HTMLElement | null;
+    const bodyEl = errorBannerEl.querySelector('#exam-timer-error-banner-body') as HTMLElement | null;
+    if (headingEl && headingEl.textContent) {
+      // キーが判別できないので invalidTimeRangeHeading 固定想定
+      headingEl.textContent = t('invalidTimeRangeHeading') || headingEl.textContent;
+    }
+    if (bodyEl && bodyEl.textContent) {
+      bodyEl.textContent = t('invalidTimeRangeBody') || bodyEl.textContent;
+    }
+  }
+}
+
+function createLocaleSwitcher() {
+  const wrap = document.createElement('div');
+  wrap.id = 'locale-switcher';
+  // In-flow layout
+  wrap.style.display = 'flex';
+  wrap.style.justifyContent = 'center';
+  wrap.style.alignItems = 'center';
+  wrap.style.gap = '8px';
+  wrap.style.marginTop = '20px';
+  wrap.style.width = '100%';
+  wrap.style.fontFamily = 'system-ui, sans-serif';
+  wrap.setAttribute('role','group');
+  wrap.setAttribute('aria-label','Language switcher');
+
+  const locales: { code: string; label: string }[] = [
+    { code: 'ja', label: '日本語' },
+    { code: 'en', label: 'English' },
+  ];
+// 今後の言語対応はまず中国語から行う予定。（第二外国語を中国語にしたので。）その際、style を再検討することとする。
+  locales.forEach(loc => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.locale = loc.code;
+    btn.textContent = loc.label;
+    btn.style.fontSize = '12px';
+    btn.style.padding = '6px 12px';
+    btn.style.lineHeight = '1';
+    btn.style.border = '1px solid #d1d5db';
+    btn.style.borderRadius = '6px';
+    btn.style.cursor = 'pointer';
+    btn.style.background = 'white';
+    btn.style.color = '#374151';
+    btn.style.transition = 'background .15s, color .15s, border-color .15s';
+    btn.onmouseenter = () => (btn.style.background = '#f3f4f6');
+    btn.onmouseleave = () => updateLocaleSwitcherActive(currentLocaleOverride || baseUILang);
+    btn.onclick = () => setLocale(loc.code);
+    wrap.appendChild(btn);
+  });
+
+  // start ボタン直後に挿入 (親が無ければ body 末尾)
+  if (startResetBtn && startResetBtn.parentElement) {
+    const parent = startResetBtn.parentElement;
+    if (startResetBtn.nextSibling) parent.insertBefore(wrap, startResetBtn.nextSibling); else parent.appendChild(wrap);
+  } else {
+    document.body.appendChild(wrap);
+  }
+  updateLocaleSwitcherActive(currentLocaleOverride || baseUILang);
+}
+
+const baseUILang = chrome.i18n.getUILanguage().split('-')[0];
+function updateLocaleSwitcherActive(active: string | null) {
+  const wrap = document.getElementById('locale-switcher');
+  if (!wrap) return;
+  wrap.querySelectorAll('button[data-locale]').forEach(b => {
+    const btn = b as HTMLButtonElement;
+    const isActive = btn.dataset.locale === active;
+    btn.style.background = isActive ? '#2563eb' : 'white';
+    btn.style.color = isActive ? '#fff' : '#374151';
+    btn.style.borderColor = isActive ? '#1d4ed8' : '#d1d5db';
+  });
+}
+
+// 起動時にストレージからオーバーライド言語を読み込み
+try {
+  chrome.storage?.local.get('overrideLocale', (res) => {
+    const loc = res?.overrideLocale as string | undefined;
+    if (loc) setLocale(loc); else updateLocaleSwitcherActive(baseUILang);
+  });
+} catch {}
+
 // --- Element Selectors ---
 const analogClock = document.getElementById('analog-clock')!;
 const hourHand = document.getElementById('hour-hand') as HTMLElement;
@@ -80,22 +241,22 @@ const handleStateUpdate = (state: TimerState) => {
     lastElapsedSeconds = state.elapsedSeconds;
   }
   
-  // Update text displays using i18n
+  // Update text displays using i18n (override 対応 t())
   if (state.status === 'readying') {
     const remainingReadySeconds = -state.elapsedSeconds;
     const minutes = Math.floor(remainingReadySeconds / 60);
     const seconds = remainingReadySeconds % 60;
-    elapsedTimeDisplay.textContent = `${chrome.i18n.getMessage("prepTime")}: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    elapsedTimeDisplay.textContent = `${t('prepTime')}: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   } else if (state.elapsedSeconds >= 0) {
     const hours = Math.floor(state.elapsedSeconds / 3600);
     const minutes = Math.floor((state.elapsedSeconds % 3600) / 60);
     const seconds = state.elapsedSeconds % 60;
-    elapsedTimeDisplay.textContent = `${chrome.i18n.getMessage("elapsedTime")}: ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    elapsedTimeDisplay.textContent = `${t('elapsedTime')}: ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }
   
-  // Update button state
+  // Update button state (override 対応)
   const isTimerActive = state.status === 'running' || state.status === 'readying';
-  startResetBtn.textContent = isTimerActive ? chrome.i18n.getMessage("reset") : chrome.i18n.getMessage("startExam");
+  startResetBtn.textContent = isTimerActive ? t('reset') : t('startExam');
   
   if (isTimerActive) {
     startResetBtn.classList.remove(...idleButtonClasses);
@@ -272,6 +433,8 @@ const initializeApp = () => {
   updateTimesFromInputs();
   updateReadyTimeFromInputs();
   startResetBtn.classList.add(...idleButtonClasses);
+  // 言語スイッチャを後から生成
+  createLocaleSwitcher();
 };
 
 // Run initialization code
@@ -411,8 +574,8 @@ window.addEventListener('exam-timer-error', (e: Event) => {
   const ce = e as CustomEvent<ExamTimerErrorDetail>;
   if (ce.detail.code === 'INVALID_TIME_RANGE') {
     showErrorBanner(
-      chrome.i18n.getMessage('invalidTimeRangeBody') ,
-      chrome.i18n.getMessage('invalidTimeRangeHeading')
+      t('invalidTimeRangeBody') || chrome.i18n.getMessage('invalidTimeRangeBody'),
+      t('invalidTimeRangeHeading') || chrome.i18n.getMessage('invalidTimeRangeHeading')
     );
   }
 });
