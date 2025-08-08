@@ -13,5 +13,7 @@
   "close": { "message": "閉じる" },
   "minutes": { "message": "分" },
   "seconds": { "message": "秒" },
-  "custom": { "message": "カスタム" }
+  "custom": { "message": "カスタム" },
+  "invalidTimeRangeHeading": { "message": "時刻設定エラー" },
+  "invalidTimeRangeBody": { "message": "開始時刻と終了時刻が同じです。変更してください。" }
 }
