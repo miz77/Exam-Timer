@@ -483,7 +483,7 @@ function ensureErrorBanner(): HTMLDivElement {
   iconWrap.style.justifyContent = 'flex-start';
   iconWrap.style.width = '32px';
   iconWrap.style.height = 'auto';
-  iconWrap.style.marginTop = '-18px'; // いい感じの位置。
+  iconWrap.style.marginTop = '-18px'; // Adjusts icon vertical position to visually align with the banner's top edge, compensating for SVG height and padding.
   iconWrap.style.color = '#ec0000';
   iconWrap.innerHTML = `
     <svg class="dads-notification-banner__icon" width="64" height="64" viewBox="0 0 26 26" role="img" aria-label="エラー" style="display:block;vertical-align:top;transform:translateY(-2px);">
