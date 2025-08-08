@@ -13,5 +13,7 @@
   "close": { "message": "Close" },
   "minutes": { "message": "min" },
   "seconds": { "message": "sec" },
-  "custom": { "message": "Custom" }
+  "custom": { "message": "Custom" },
+  "invalidTimeRangeHeading": { "message": "Time Setting Error" },
+  "invalidTimeRangeBody": { "message": "The start time and end time are the same. Please change them." }
 }

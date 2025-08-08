@@ -198,6 +198,8 @@ const handleDragStart = (e: MouseEvent | TouchEvent) => {
 const handleDragMove = (e: MouseEvent | TouchEvent) => {
   if (!isDragging) return;
   e.preventDefault();
+  // 針移動イベント: エラー通知を閉じるトリガー用
+  window.dispatchEvent(new Event('exam-timer-hand-moved'));
   updateTimeFromEvent('touches' in e ? e.touches[0] : e);
 };
 
@@ -274,3 +276,146 @@ const initializeApp = () => {
 
 // Run initialization code
 initializeApp();
+
+// ====　エラー通知ここから ====
+
+
+interface ExamTimerErrorDetail { code: string }
+
+
+let errorBannerEl: HTMLDivElement | null = null;
+let errorBannerTimer: number | null = null;
+
+function ensureErrorBanner(): HTMLDivElement {
+  if (errorBannerEl) return errorBannerEl;
+  const el = document.createElement('div');
+  el.id = 'exam-timer-error-banner';
+  el.setAttribute('role', 'alert');
+  el.setAttribute('aria-live', 'assertive');
+  el.style.position = 'fixed';
+  el.style.top = '0';
+  el.style.left = '0';
+  el.style.right = '0';
+  el.style.display = 'flex';
+  el.style.alignItems = 'flex-start';
+  el.style.gap = '16px';
+  el.style.padding = '20px 28px';
+  el.style.background = '#fff'; 
+  el.style.border = '2px solid #ec0000';       // デジタル庁デザインシステム red-800
+  el.style.borderRadius = '14px';
+  el.style.color = '#484D4E';
+  el.style.backdropFilter = 'blur(2px)';
+  el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+  el.style.fontFamily = '"Noto Sans JP", system-ui, sans-serif';
+  el.style.zIndex = '10000';
+  el.style.transform = 'translateY(-100%)';
+  el.style.transition = 'transform .35s ease, opacity .35s ease';
+  el.style.opacity = '0';
+
+  // アイコン (八角形 + X)
+  const iconWrap = document.createElement('div');
+  iconWrap.style.flex = '0 0 auto';
+  iconWrap.style.display = 'flex';
+  iconWrap.style.alignItems = 'flex-start';
+  iconWrap.style.justifyContent = 'flex-start';
+  iconWrap.style.width = '32px';
+  iconWrap.style.height = 'auto';
+  iconWrap.style.marginTop = '-18px'; // いい感じの位置。
+  iconWrap.style.color = '#ec0000';
+  iconWrap.innerHTML = `
+    <svg class="dads-notification-banner__icon" width="64" height="64" viewBox="0 0 26 26" role="img" aria-label="エラー" style="display:block;vertical-align:top;transform:translateY(-2px);">
+      <path d="M8.25 21 3 15.75v-7.5L8.25 3h7.5L21 8.25v7.5L15.75 21h-7.5Z" fill="currentColor"/>
+      <path d="m12 13.4-2.85 2.85-1.4-1.4L10.6 12 7.75 9.15l1.4-1.4L12 10.6l2.85-2.85 1.4 1.4L13.4 12l2.85 2.85-1.4 1.4L12 13.4Z" fill="#fff"/>
+    </svg>`;
+
+  // テキストコンテナ
+  const textWrap = document.createElement('div');
+  textWrap.style.flex = '1 1 auto';
+  textWrap.style.minWidth = '0';
+
+  const heading = document.createElement('h2');
+  heading.id = 'exam-timer-error-banner-heading';
+  heading.style.margin = '0 0 6px';
+  heading.style.fontSize = '16px';
+  heading.style.fontWeight = '700';
+  heading.style.lineHeight = '1.4';
+  heading.style.color = '#364153';
+  heading.textContent = chrome.i18n.getMessage('invalidTimeRangeHeading') || 'Time Setting Error';
+
+  const bodyP = document.createElement('p');
+  bodyP.id = 'exam-timer-error-banner-body';
+  bodyP.style.margin = '0';
+  bodyP.style.fontSize = '14px';
+  bodyP.style.lineHeight = '1.6';
+  bodyP.style.color = '#484D4E';
+  bodyP.textContent = chrome.i18n.getMessage('invalidTimeRangeBody') || 'The start time and end time are the same. Please change them.';
+
+  textWrap.appendChild(heading);
+  textWrap.appendChild(bodyP);
+
+  // 任意の閉じるボタン
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.setAttribute('aria-label', chrome.i18n.getMessage('close') || 'close');
+  closeBtn.style.flex = '0 0 auto';
+  closeBtn.style.background = 'transparent';
+  closeBtn.style.border = 'none';
+  closeBtn.style.cursor = 'pointer';
+  closeBtn.style.padding = '4px';
+  closeBtn.style.margin = '0 0 0 4px';
+  closeBtn.style.lineHeight = '0';
+  closeBtn.style.color = '#6b7280';
+  closeBtn.style.alignSelf = 'flex-start';
+  closeBtn.onmouseenter = () => (closeBtn.style.color = '#374151');
+  closeBtn.onmouseleave = () => (closeBtn.style.color = '#6b7280');
+  closeBtn.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" d="m6.4 18.6-1-1 5.5-5.6-5.6-5.6 1.1-1 5.6 5.5 5.6-5.6 1 1.1L13 12l5.6 5.6-1 1L12 13l-5.6 5.6Z"/>
+    </svg>`;
+  closeBtn.addEventListener('click', () => hideErrorBanner());
+
+  el.appendChild(iconWrap);
+  el.appendChild(textWrap);
+  el.appendChild(closeBtn);
+  document.body.appendChild(el);
+  errorBannerEl = el;
+  return el;
+}
+
+function showErrorBanner(overrideBody?: string, overrideHeading?: string) {
+  const el = ensureErrorBanner();
+  // 上書き (i18n が無い場合フォールバック)
+  const headingEl = el.querySelector('#exam-timer-error-banner-heading') as HTMLElement;
+  const bodyEl = el.querySelector('#exam-timer-error-banner-body') as HTMLElement;
+  if (overrideHeading) headingEl.textContent = overrideHeading;
+  if (overrideBody) bodyEl.textContent = overrideBody;
+
+  requestAnimationFrame(() => {
+    el.style.opacity = '1';
+    el.style.transform = 'translateY(0)';
+  });
+  if (errorBannerTimer) window.clearTimeout(errorBannerTimer);
+  // 自動で消える (5秒後)
+  errorBannerTimer = window.setTimeout(() => hideErrorBanner(), 5000);
+}
+
+function hideErrorBanner() {
+  if (!errorBannerEl) return;
+  const el = errorBannerEl;
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(-100%)';
+  if (errorBannerTimer) { window.clearTimeout(errorBannerTimer); errorBannerTimer = null; }
+}
+
+window.addEventListener('exam-timer-error', (e: Event) => {
+  const ce = e as CustomEvent<ExamTimerErrorDetail>;
+  if (ce.detail.code === 'INVALID_TIME_RANGE') {
+    showErrorBanner(
+      chrome.i18n.getMessage('invalidTimeRangeBody') ,
+      chrome.i18n.getMessage('invalidTimeRangeHeading')
+    );
+  }
+});
+// ユーザーが針を動かしたらエラー通知は非表示にする。すなわち [5秒経過 or 針を動かす] のどちらかで消える仕様に。
+window.addEventListener('exam-timer-hand-moved', () => hideErrorBanner());
+// ==== エラー通知(v1.0.1追加) ====

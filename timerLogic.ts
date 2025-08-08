@@ -79,8 +79,11 @@ export class ExamTimer {
     if (this.status !== 'idle') return;
 
     if (this.totalDurationSeconds <= 0) {
+      // 不正な時間（開始時刻 = 終了時刻）をUIへ通知
+      window.dispatchEvent(new CustomEvent('exam-timer-error', {
+        detail: { code: 'INVALID_TIME_RANGE' }
+      }));
       console.error("終了時刻は開始時刻と等しいか、それ以前に設定されています。");
-      // UIにエラーを通知する仕組みを後で追加 (v1.0.1 を予定)
       return;
     }
 
